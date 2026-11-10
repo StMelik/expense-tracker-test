@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
-import type { Transaction } from '@prisma/client';
+import type { Prisma, Transaction } from '@prisma/client';
 import type {
   CreateTransactionDto,
   ListTransactionsQuery,
@@ -34,18 +34,27 @@ export class TransactionsService {
 
   async findAll(
     userId: string,
-    { year, month }: ListTransactionsQuery,
+    { year, month, page, limit }: ListTransactionsQuery,
   ): Promise<TransactionsListResponse> {
     // Период [from, to) в UTC: месяц целиком либо весь год.
-    const from = new Date(Date.UTC(year, month ? month - 1 : 0, 1));
-    const to = new Date(Date.UTC(month ? year : year + 1, month ?? 0, 1));
-    const where = { userId, date: { gte: from, lt: to } };
+    // Без year период не ограничивается (за всё время).
+    const where: Prisma.TransactionWhereInput = { userId };
+    if (year !== undefined) {
+      const from = new Date(Date.UTC(year, month ? month - 1 : 0, 1));
+      const to = new Date(Date.UTC(month ? year : year + 1, month ?? 0, 1));
+      where.date = { gte: from, lt: to };
+    }
 
-    const [rows, sums] = await Promise.all([
+    const [rows, total, sums] = await Promise.all([
       this.prisma.transaction.findMany({
         where,
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        // id — тай-брейк: без него порядок строк с равными ключами недетерминирован,
+        // и записи могут дублироваться/пропадать на границе страниц.
+        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
       }),
+      this.prisma.transaction.count({ where }),
       this.prisma.transaction.groupBy({
         by: ['type'],
         where,
@@ -65,6 +74,7 @@ export class TransactionsService {
         expense,
         balance: Math.round((income - expense) * 100) / 100,
       },
+      pagination: { page, limit, total },
     };
   }
 

@@ -1,1 +1,1 @@
-export { ApiError, apiFetch } from './client';
+export { ApiError, apiFetch, setUnauthorizedHandler } from './client';
