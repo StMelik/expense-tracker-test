@@ -7,6 +7,7 @@ import { listCategories } from '@/entities/category';
 import { listTransactions } from '@/entities/transaction';
 import { ApiError } from '@/shared/api';
 
+// Должен совпадать с дефолтным limit на сервере (listTransactionsQuerySchema).
 export const PAGE_SIZE = 10;
 
 export function useRecentTransactions(token: string | undefined) {
@@ -14,17 +15,29 @@ export function useRecentTransactions(token: string | undefined) {
   const [reloadKey, setReloadKey] = useState(0);
   const [data, setData] = useState<TransactionsListResponse | null>(null);
   const [categories, setCategories] = useState<Map<string, CategoryResponse>>(new Map());
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [categoriesFailed, setCategoriesFailed] = useState(false);
+  const [categoriesKey, setCategoriesKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!token) return;
+    let cancelled = false;
+    setCategories(new Map());
+    setCategoriesLoaded(false);
     setCategoriesFailed(false);
     listCategories(token)
-      .then((list) => setCategories(new Map(list.map((c) => [c.id, c]))))
-      .catch(() => setCategoriesFailed(true));
-  }, [token]);
+      .then((list) => {
+        if (cancelled) return;
+        setCategories(new Map(list.map((c) => [c.id, c])));
+        setCategoriesLoaded(true);
+      })
+      .catch(() => !cancelled && setCategoriesFailed(true));
+    return () => {
+      cancelled = true;
+    };
+  }, [token, categoriesKey]);
 
   useEffect(() => {
     if (!token) return;
@@ -43,14 +56,34 @@ export function useRecentTransactions(token: string | undefined) {
     };
   }, [token, page, reloadKey]);
 
+  const total = data?.pagination.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Если total уменьшился и текущая страница вышла за пределы — возвращаемся на последнюю.
+  useEffect(() => {
+    if (data && page > totalPages) setPage(totalPages);
+  }, [data, page, totalPages]);
+
   // После создания возвращаемся на первую страницу и перезагружаем список.
   const reload = useCallback(() => {
     setPage(1);
     setReloadKey((k) => k + 1);
   }, []);
 
-  const total = data?.pagination.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const reloadCategories = useCallback(() => setCategoriesKey((k) => k + 1), []);
 
-  return { page, setPage, data, categories, categoriesFailed, error, loading, total, totalPages, reload };
+  return {
+    page,
+    setPage,
+    data,
+    categories,
+    categoriesLoaded,
+    categoriesFailed,
+    reloadCategories,
+    error,
+    loading,
+    total,
+    totalPages,
+    reload,
+  };
 }

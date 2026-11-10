@@ -5,19 +5,25 @@ const KEY = 'expense.session';
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
+// Запасное in-memory хранилище: используется, когда localStorage недоступен
+// (приватный режим, превышена квота) — сессия живёт до перезагрузки страницы.
+let memoryRaw: string | null = null;
+
 function readRaw(): string | null {
   try {
-    return localStorage.getItem(KEY);
+    return localStorage.getItem(KEY) ?? memoryRaw;
   } catch {
-    return null;
+    return memoryRaw;
   }
 }
 
 export function saveSession(session: AuthResponse): void {
+  const raw = JSON.stringify(session);
   try {
-    localStorage.setItem(KEY, JSON.stringify(session));
+    localStorage.setItem(KEY, raw);
+    memoryRaw = null;
   } catch {
-    // хранилище недоступно — сессия живёт только до перезагрузки
+    memoryRaw = raw;
   }
   notify();
 }
@@ -32,6 +38,7 @@ export function loadSession(): AuthResponse | null {
 }
 
 export function clearSession(): void {
+  memoryRaw = null;
   try {
     localStorage.removeItem(KEY);
   } catch {

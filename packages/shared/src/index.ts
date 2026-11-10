@@ -25,13 +25,19 @@ export const updateTransactionSchema = createTransactionSchema
   });
 export type UpdateTransactionDto = z.infer<typeof updateTransactionSchema>;
 
-export const listTransactionsQuerySchema = z.object({
-  year: z.coerce.number().int().min(1970).max(9999).optional(),
-  month: z.coerce.number().int().min(1).max(12).optional(),
-  // Верхняя граница защищает от переполнения Int32 в skip у Prisma.
-  page: z.coerce.number().int().min(1).max(100_000).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(10),
-});
+export const listTransactionsQuerySchema = z
+  .object({
+    year: z.coerce.number().int().min(1970).max(9999).optional(),
+    month: z.coerce.number().int().min(1).max(12).optional(),
+    // Верхняя граница защищает от переполнения Int32 в skip у Prisma.
+    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+  })
+  // month без year иначе молча игнорировался бы и отдавал данные за всё время.
+  .refine((q) => q.month === undefined || q.year !== undefined, {
+    message: 'month требует year',
+    path: ['month'],
+  });
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;
 
 export type TransactionResponse = {

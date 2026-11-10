@@ -17,7 +17,9 @@ export function RecentTransactions() {
     setPage,
     data,
     categories,
+    categoriesLoaded,
     categoriesFailed,
+    reloadCategories,
     error,
     loading,
     total,
@@ -38,10 +40,16 @@ export function RecentTransactions() {
       <CardContent>
         {creating && categoriesFailed && (
           <p role="alert" className="mb-6 rounded-lg border p-4 text-sm text-destructive">
-            Не удалось загрузить категории. Обновите страницу и попробуйте снова.
+            Не удалось загрузить категории.{' '}
+            <Button variant="link" size="sm" className="h-auto p-0" onClick={reloadCategories}>
+              Повторить
+            </Button>
           </p>
         )}
-        {creating && !categoriesFailed && token && categories.size === 0 && (
+        {creating && !categoriesFailed && !categoriesLoaded && (
+          <p className="mb-6 text-sm text-muted-foreground">Загрузка категорий…</p>
+        )}
+        {creating && categoriesLoaded && token && categories.size === 0 && (
           <p className="mb-6 rounded-lg border p-4 text-sm text-muted-foreground">
             Сначала создайте хотя бы одну категорию — транзакция привязывается к категории.
           </p>
@@ -78,7 +86,7 @@ export function RecentTransactions() {
             ))}
           </ul>
         )}
-        {data && total > PAGE_SIZE && (
+        {data && (total > PAGE_SIZE || page > 1) && (
           <div className="mt-4 flex items-center justify-between">
             <Button
               variant="outline"
