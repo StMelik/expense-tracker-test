@@ -63,6 +63,28 @@ Prisma-скрипты в `apps/api` запускаются через `node --en
 
 Команд для lint и тестов пока нет; при их добавлении обновите этот раздел.
 
+## Соглашение о коммитах
+
+Используем [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <описание>`.
+
+- `type`: `feat` (новая функциональность), `fix` (исправление бага), `refactor`, `perf`, `docs`, `style` (форматирование без смены логики), `test`, `build` (сборка, зависимости), `ci`, `chore` (прочее, в т. ч. миграции и конфиги).
+- `scope` — опциональная область изменения: `api`, `web`, `shared`, `db`, а при необходимости модуль или слайс (`auth`, `categories`, `transactions`, `auth-login`). Для изменений, затрагивающих несколько областей, scope опускается.
+- Описание — в повелительном наклонении, со строчной буквы, без точки в конце, до ~72 символов. Язык — английский (тело коммита при необходимости можно писать на русском).
+- Тело коммита (после пустой строки) объясняет, **почему** сделано изменение, а не что именно изменено.
+- Breaking change помечается `!` после типа/scope (`feat(api)!: ...`) и/или футером `BREAKING CHANGE: ...`.
+- Один коммит — одно логическое изменение. Изменения `schema.prisma` и соответствующая миграция коммитятся вместе; изменения `packages/shared` вместе с зависимыми правками `api`/`web`, если контракт ломается.
+- Не коммитить `.env`, `node_modules`, `dist`, `.next` и прочие артефакты сборки.
+- Коммиты и пуши делаются только по явной просьбе пользователя.
+
+Примеры:
+
+```
+feat(transactions): add monthly summary to GET /transactions
+fix(auth): return 401 for expired JWT
+chore(db): add migration for Transaction table
+docs: add commit conventions to CLAUDE.md
+```
+
 ## Переменные окружения
 
 Шаблон — `.env.example`: `POSTGRES_*`, `DATABASE_URL` (читает Prisma), `API_PORT`, `JWT_SECRET` (обязателен, API не стартует без него), `JWT_EXPIRES_IN` (по умолчанию `1h`), `NEXT_PUBLIC_API_URL` (адрес API для фронта).
