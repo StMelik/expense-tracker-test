@@ -26,8 +26,11 @@ export const updateTransactionSchema = createTransactionSchema
 export type UpdateTransactionDto = z.infer<typeof updateTransactionSchema>;
 
 export const listTransactionsQuerySchema = z.object({
-  year: z.coerce.number().int().min(1970).max(9999),
+  year: z.coerce.number().int().min(1970).max(9999).optional(),
   month: z.coerce.number().int().min(1).max(12).optional(),
+  // Верхняя граница защищает от переполнения Int32 в skip у Prisma.
+  page: z.coerce.number().int().min(1).max(100_000).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
 });
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;
 
@@ -44,6 +47,7 @@ export type TransactionResponse = {
 export type TransactionsListResponse = {
   items: TransactionResponse[];
   summary: { income: number; expense: number; balance: number };
+  pagination: { page: number; limit: number; total: number };
 };
 
 export const registerSchema = z.object({
