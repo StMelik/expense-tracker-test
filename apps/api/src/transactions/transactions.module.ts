@@ -5,6 +5,11 @@ import { CountTransactionsByCategoryHandler } from './handlers/count-transaction
 import { TransactionsController } from './transactions.controller';
 import { TransactionsService } from './transactions.service';
 
+/**
+ * Модуль транзакций: контроллер, сервис и CQRS-handler подсчёта транзакций
+ * по категории (используется модулем категорий). `AuthModule` даёт
+ * `JwtAuthGuard`; `PrismaService` приходит из глобального `PrismaModule`.
+ */
 @Module({
   imports: [CqrsModule, AuthModule],
   controllers: [TransactionsController],

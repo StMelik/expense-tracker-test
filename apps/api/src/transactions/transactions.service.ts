@@ -14,6 +14,12 @@ import {
 } from '../contracts/categories.contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * Бизнес-логика транзакций (доходы и расходы пользователя).
+ *
+ * Все методы работают в границах одного пользователя: чужая транзакция
+ * неотличима от несуществующей (404).
+ */
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -21,6 +27,14 @@ export class TransactionsService {
     private readonly queryBus: QueryBus,
   ) {}
 
+  /**
+   * Создаёт транзакцию пользователя.
+   *
+   * @param userId - идентификатор владельца (из JWT).
+   * @param dto - провалидированные данные новой транзакции.
+   * @returns созданная транзакция в формате ответа API.
+   * @throws {NotFoundException} если категория не существует или принадлежит другому пользователю.
+   */
   async create(
     userId: string,
     dto: CreateTransactionDto,
@@ -32,6 +46,18 @@ export class TransactionsService {
     return this.toResponse(created);
   }
 
+  /**
+   * Возвращает страницу транзакций пользователя с итогами за весь период.
+   *
+   * Период (UTC) задаётся `year` (весь год) или `year` + `month` (месяц);
+   * без `year` берётся всё время. Порядок: `date desc, createdAt desc, id desc`.
+   * `summary` считается по всему периоду, а не только по текущей странице.
+   *
+   * @param userId - идентификатор владельца (из JWT).
+   * @param query - фильтр периода и пагинация (`year`, `month`, `page`, `limit`).
+   * @returns `items` (страница), `summary` (доход, расход, баланс) и `pagination`.
+   * @throws {PrismaClientKnownRequestError} при ошибке обращения к БД (проявляется как 500).
+   */
   async findAll(
     userId: string,
     { year, month, page, limit }: ListTransactionsQuery,
@@ -78,10 +104,27 @@ export class TransactionsService {
     };
   }
 
+  /**
+   * Возвращает одну транзакцию пользователя по идентификатору.
+   *
+   * @param userId - идентификатор владельца (из JWT).
+   * @param id - идентификатор транзакции.
+   * @returns транзакция в формате ответа API.
+   * @throws {NotFoundException} если транзакция не найдена или принадлежит другому пользователю.
+   */
   async findOne(userId: string, id: string): Promise<TransactionResponse> {
     return this.toResponse(await this.getOwned(userId, id));
   }
 
+  /**
+   * Частично обновляет транзакцию пользователя.
+   *
+   * @param userId - идентификатор владельца (из JWT).
+   * @param id - идентификатор транзакции.
+   * @param dto - изменяемые поля (хотя бы одно).
+   * @returns обновлённая транзакция в формате ответа API.
+   * @throws {NotFoundException} если транзакция не найдена/чужая либо новая категория не найдена/чужая.
+   */
   async update(
     userId: string,
     id: string,
@@ -96,12 +139,28 @@ export class TransactionsService {
     return this.toResponse(updated);
   }
 
+  /**
+   * Удаляет транзакцию пользователя.
+   *
+   * @param userId - идентификатор владельца (из JWT).
+   * @param id - идентификатор транзакции.
+   * @returns ничего (`void`).
+   * @throws {NotFoundException} если транзакция не найдена или принадлежит другому пользователю.
+   */
   async remove(userId: string, id: string): Promise<void> {
     await this.getOwned(userId, id);
     await this.prisma.transaction.delete({ where: { id } });
   }
 
-  // Категория проверяется через CQRS: чужая неотличима от несуществующей.
+  /**
+   * Проверяет, что категория существует и принадлежит пользователю.
+   * Проверка идёт через CQRS: чужая категория неотличима от несуществующей.
+   *
+   * @param userId - идентификатор владельца.
+   * @param categoryId - идентификатор проверяемой категории.
+   * @returns ничего, если категория доступна пользователю.
+   * @throws {NotFoundException} если категория не найдена или чужая.
+   */
   private async assertCategory(userId: string, categoryId: string) {
     const category: CategoryRef | null = await this.queryBus.execute(
       new GetCategoryByIdQuery(userId, categoryId),
@@ -109,6 +168,14 @@ export class TransactionsService {
     if (!category) throw new NotFoundException('Категория не найдена');
   }
 
+  /**
+   * Загружает транзакцию, принадлежащую пользователю.
+   *
+   * @param userId - идентификатор владельца.
+   * @param id - идентификатор транзакции.
+   * @returns запись Prisma `Transaction`.
+   * @throws {NotFoundException} если транзакция не найдена или чужая.
+   */
   private async getOwned(userId: string, id: string) {
     const tx = await this.prisma.transaction.findFirst({
       where: { id, userId },
@@ -117,6 +184,14 @@ export class TransactionsService {
     return tx;
   }
 
+  /**
+   * Преобразует запись Prisma в формат ответа API
+   * (`amount` Decimal → number, даты → ISO-строки).
+   *
+   * @param tx - запись `Transaction` из БД.
+   * @returns транзакция в формате `TransactionResponse`.
+   * @throws не выбрасывает исключений.
+   */
   private toResponse(tx: Transaction): TransactionResponse {
     return {
       id: tx.id,

@@ -1,8 +1,13 @@
 import { z } from 'zod';
 
+/** Тип транзакции: доход (`income`) или расход (`expense`). */
 export const transactionTypeSchema = z.enum(['income', 'expense']);
 export type TransactionType = z.infer<typeof transactionTypeSchema>;
 
+/**
+ * Схема создания транзакции: `amount` > 0, до 2 знаков после запятой, не более 9 999 999 999.99;
+ * `description` до 255 символов (trim); `date` — ISO 8601 datetime; `categoryId` непустой.
+ */
 export const createTransactionSchema = z.object({
   amount: z
     .number()
@@ -18,6 +23,7 @@ export const createTransactionSchema = z.object({
 });
 export type CreateTransactionDto = z.infer<typeof createTransactionSchema>;
 
+/** Схема частичного обновления транзакции: все поля опциональны, но нужно передать хотя бы одно. */
 export const updateTransactionSchema = createTransactionSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, {
@@ -25,6 +31,10 @@ export const updateTransactionSchema = createTransactionSchema
   });
 export type UpdateTransactionDto = z.infer<typeof updateTransactionSchema>;
 
+/**
+ * Схема query-параметров списка транзакций: `year` (1970–9999), `month` (1–12, только вместе с `year`),
+ * `page` (по умолчанию 1, макс. 100000), `limit` (по умолчанию 10, макс. 100). Числа приводятся из строк.
+ */
 export const listTransactionsQuerySchema = z
   .object({
     year: z.coerce.number().int().min(1970).max(9999).optional(),
@@ -40,6 +50,7 @@ export const listTransactionsQuerySchema = z
   });
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;
 
+/** Транзакция в ответе API: `amount` — number, даты — ISO-строки. */
 export type TransactionResponse = {
   id: string;
   amount: number;
@@ -50,6 +61,10 @@ export type TransactionResponse = {
   createdAt: string;
 };
 
+/**
+ * Ответ `GET /transactions`: `items` — текущая страница, `summary` — итоги по всему периоду (UTC),
+ * `pagination` — номер страницы, размер и общее число записей.
+ */
 export type TransactionsListResponse = {
   items: TransactionResponse[];
   summary: { income: number; expense: number; balance: number };
