@@ -1,6 +1,8 @@
 ---
 name: commit
 description: Создание git-коммитов в этом проекте по Conventional Commits (type, scope, формат описания, тело, breaking changes, что нельзя коммитить). Использовать, когда пользователь просит закоммитить изменения.
+model: sonnet
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git checkout -b:*), Bash(git add:*), Bash(git commit:*)
 ---
 
 # Коммиты
